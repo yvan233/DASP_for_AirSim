@@ -10,11 +10,18 @@ class DaspCarServer():
         self.host = host
         self.port = port
         self.car = AirSimCarAgent(ip = UE_ip, vehicle_name= vehicle_name)
-        self.record = AirSimCarAgent(ip = UE_ip)
-        self.thread = Thread(target=self.record.upload_video_lidar, args = (remote_ip,), daemon=True)
+        self.clients = {}
+        self.clients["state"] = AirSimCarAgent(ip = UE_ip)
+        self.clients["video"] = AirSimCarAgent(ip = UE_ip)
+        self.clients["lidar"] = AirSimCarAgent(ip = UE_ip)
+        self.threads = []
+        self.threads["state"] = Thread(target=self.clients["state"].updateState, args = (), daemon=True)
+        self.threads["video"] = Thread(target=self.clients["video"].updateVideo, args = (), daemon=True)
+        self.threads["lidar"] = Thread(target=self.clients["lidar"].updateLidar, args = (), daemon=True)
 
     def run(self):
-        self.thread.start()
+        for thread in self.threads.values():
+            thread.start()
         while True:
             try:
                 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -58,10 +65,20 @@ class DaspCarServer():
                 self.send(sock, "Reset OK")
             elif pack["Method"] == "Start record":
                 path = pack['Data']
-                self.record.startRecording(path)
+                for client in self.clients.values():
+                    client.startRecording(path)
                 self.send(sock, "Start OK")
             elif pack["Method"] == "Stop record":
-                self.record.stopRecording()
+                for client in self.clients.values():
+                    client.stopRecording()
+                self.send(sock, "Stop OK")
+            elif pack["Method"] == "Start upload":
+                parameter = pack['Data']
+                self.car.startUpload(parameter)
+                self.send(sock, "Start OK")
+            elif pack["Method"] == "Stop upload":
+                parameter = pack['Data']
+                self.car.stopUpload(parameter)
                 self.send(sock, "Stop OK")
             else:
                 info = "请根据提供的接口发送请求"

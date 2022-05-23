@@ -3,6 +3,7 @@ import socket
 import json
 import time
 import numpy as np
+import struct
 
 class DaspCarClient():
     def __init__(self, host = "localhost", port = 5000):
@@ -56,7 +57,19 @@ class DaspCarClient():
         data = self.recv()
         return data["Method"]
 
-def get_image(remote_ip = "127.0.0.1"):
+    def start_upload(self, parameter):
+        # parameter = {"type": "video","IP": 127.0.0.1,"port": 5001}
+        self.send("Start upload", parameter)
+        data = self.recv()
+        return data["Method"]
+
+    def stop_upload(self, parameter):
+        # parameter = {"type": "video"}
+        self.send("Stop upload", parameter)
+        data = self.recv()
+        return data["Method"]
+
+def get_image(remote_ip = "127.0.0.1", port = 5001):
     """
     获取图像数据
     """
@@ -68,7 +81,51 @@ def get_image(remote_ip = "127.0.0.1"):
     sock.close()
     return image
 
-def get_lidar(remote_ip = "127.0.0.1"):
+def get_video(self, host, port, adjID = ""):
+    """
+    长连接循环接收数据框架
+    """
+    while True:
+        server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server.bind((host, port))
+        server.listen(1) #接收的连接数
+        conn, addr = server.accept()
+        print('Connected by {}:{}'.format(addr[0], addr[1]))
+        # FIFO消息队列
+        dataBuffer = bytes()
+        with conn:
+            while True:
+                try:
+                    data = conn.recv(1024)
+                except Exception as e:
+                    # 发送端进程被杀掉
+                    self.RecvDisconnectHandle(addr, adjID)
+                    break
+                if data == b"":
+                    # 发送端close()
+                    self.RecvDisconnectHandle(addr, adjID)
+                    break
+                if data:
+                    # 把数据存入缓冲区，类似于push数据
+                    dataBuffer += data
+                    while True:
+                        if len(dataBuffer) < self.headerSize:
+                            break  #数据包小于消息头部长度，跳出小循环
+                        # 读取包头
+                        headPack = struct.unpack(self.headformat, dataBuffer[:self.headerSize])
+                        bodySize = headPack[1]
+                        if len(dataBuffer) < self.headerSize+bodySize :
+                            break  #数据包不完整，跳出小循环
+                        # 读取消息正文的内容
+                        body = dataBuffer[self.headerSize:self.headerSize+bodySize]
+                        body = body.decode()
+                        body = json.loads(body)
+                        # 数据处理
+                        self.MessageHandle(headPack, body, conn)
+                        # 数据出列
+                        dataBuffer = dataBuffer[self.headerSize+bodySize:]
+
+def get_lidar(remote_ip = "127.0.0.1", port = 5002):
     """
     获取雷达数据
     """

@@ -5,6 +5,7 @@ import time
 import cv2
 import csv
 import sys
+import struct
 import socket
 from threading import Thread
 
@@ -26,7 +27,9 @@ class AirSimCarAgent():
         image_size = (84, 84, 1)  # image shape for default gym env
         ## name
         self.name = vehicle_name
-        self.recordflag = False
+        self.record_flag = False
+        self.upload_video_flag = False
+        self.upload_lidar_flag = False
         self.header = ['timestamp', 'position', 'orientation', 'speed', 'throttle', 'steering', 'brake', 
             'linear_velocity', 'linear_acceleration', 'angular_velocity', 'angular_acceleration']
         self.connect(ip, control_flag)
@@ -90,28 +93,25 @@ class AirSimCarAgent():
         np_response_image = np.asarray(bytearray(img_response), dtype="uint8")
         decoded_frame = cv2.imdecode(np_response_image, cv2.IMREAD_COLOR)
         # cv2.imwrite("result.jpg", decoded_frame)
-        ret, encoded_jpeg = cv2.imencode('.jpg', decoded_frame)
-        data = encoded_jpeg.tobytes()
-        image = cv2.imdecode(encoded_jpeg, cv2.IMREAD_COLOR)
+        ret, image = cv2.imencode('.jpg', decoded_frame)
         # 解码
         # imgstring = np.asarray(bytearray(data), dtype="uint8")
         # image = cv2.imdecode(imgstring, cv2.IMREAD_COLOR)
-        return image, data
+        return image
 
     def get_lidar(self):
         # 获取车辆雷达数据
         lidar_data = self.car.getLidarData("Lidar1", self.name)
-
         if (len(lidar_data.point_cloud) < 3):
             print("No points received from Lidar data")
-            return np.array([])
+            return lidar_data.time_stamp, np.array([])
         else:
             points = np.array(lidar_data.point_cloud, dtype=np.dtype('f4'))
             # data = points.tobytes()
             # 解码
             # points = np.asarray(bytearray(data), dtype=np.dtype('f4'))
             # points =  np.reshape(points, (int(points.shape[0]/3), 3)) # reshape array of floats to array of [X,Y,Z]
-            return points
+            return lidar_data.time_stamp, points
 
 
     def startRecording(self, rootpath = "D:/Qiyuan/Record"):
@@ -124,34 +124,84 @@ class AirSimCarAgent():
         with open(self.path+'/record.csv', 'a', newline='',encoding='utf-8') as f: 
             writer = csv.DictWriter(f,fieldnames=self.header) 
             writer.writeheader()  # 写入列名
-        self.recordflag = True
-
+        self.record_flag = True
+        
     def stopRecording(self):
         # 停止记录
-        self.recordflag = False
+        self.record_flag = False
 
-    def upload_video_lidar(self,remote_ip):
-        # 上传视频和雷达数据
-        clisocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    def startUpload(self, parameter):
+        type = parameter["type"]
+        remote_ip = parameter["IP"]
+        port = parameter["port"]
+        # 开始上传
+        if type == "video":
+            self.upload_video_flag = True
+            self.video_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.video_socket.connect((remote_ip, port))
+        elif type == "lidar":
+            self.upload_lidar_flag = True
+            self.lidar_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.lidar_socket.connect((remote_ip, port))
+        else:
+            pass
+
+    def stopUpload(self, parameter):
+        type = parameter["type"]
+        # 停止上传
+        if type == "video":
+            self.upload_video_flag = False
+            self.video_socket.close()
+        elif type == "lidar":
+            self.upload_lidar_flag = False
+            self.lidar_socket.close()
+        else:
+            pass
+    
+    def updateVideo(self):
+        # 记录及上传视频数据
         while True:
-            image, data = self.get_image()
-            lidar_data = self.get_lidar()
-            state = self.get_car_state()
-            print(state["timestamp"], sys.getsizeof(data), sys.getsizeof(lidar_data))
-            clisocket.sendto(data, (remote_ip, 5001))
-            if lidar_data.size:
-                clisocket.sendto(lidar_data.tobytes(), (remote_ip, 5002))
-            # 如果打开录制
-            if self.recordflag:
+            if self.record_flag or self.upload_video_flag:
+                image = self.get_image()
+                state = self.get_car_state()
                 time_stamp = state["timestamp"]
-                filepath0 = os.path.join(self.path, "record.csv")
-                filepath1 = os.path.join(self.path, "pointcloud/pointcloud_" + time_stamp)
-                filepath2 = os.path.join(self.path, "image/img_" + time_stamp+".jpg")
-                with open(filepath0, 'a', newline='',encoding='utf-8-sig') as f: 
+                if self.upload_video_flag:
+                    self.sendallAddHead(self.video_socket, image.tobytes(), time_stamp)
+                if self.record_flag:
+                    filepath = os.path.join(self.path, "image/img_" + time_stamp+".jpg")
+                    cv2.imwrite(filepath, image)
+
+    def updateLidar(self):
+        # 记录及上传雷达数据
+        while True:
+            if self.record_flag or self.upload_lidar_flag:
+                time_stamp, lidar_data = self.get_lidar()
+                if self.upload_lidar_flag and lidar_data.size:
+                    self.sendallAddHead(self.video_socket, lidar_data.tobytes(), time_stamp)
+                if self.record_flag:
+                    filepath = os.path.join(self.path, "pointcloud/pointcloud_" + time_stamp)
+                    np.save(filepath, lidar_data)
+
+    def updateState(self):
+        # 记录状态信息
+        while True:
+            if self.record_flag:
+                state = self.get_car_state()
+                filepath = os.path.join(self.path, "record.csv")
+                with open(filepath, 'a', newline='',encoding='utf-8-sig') as f: 
                     writer = csv.DictWriter(f,fieldnames=self.header) 
                     writer.writerow(state) 
-                np.save(filepath1, lidar_data)
-                cv2.imwrite(filepath2, image)
+
+    def sendallAddHead(self, socket, data:bytes, time_stamp, methods = 1):
+        '''
+        为发送的数据添加methods和length报头
+            POST: methods = 1
+            REFUSE: methods = 9
+        '''
+        body = data
+        header = [methods, body.__len__(), time_stamp]
+        headPack = struct.pack("!IIQ" , *header)
+        socket.sendall(headPack+body)
 
 if __name__ == '__main__':
     # 开启udp视频流
