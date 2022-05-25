@@ -1,5 +1,6 @@
 # 启动系统并运行分布式算法
-import time 
+import time
+import subprocess 
 import sys
 sys.path.insert(1,".") # 把上一级目录加入搜索路径
 from threading import Thread
@@ -7,7 +8,7 @@ from moniter import moniter
 from DASP.module import Node
 from DASP.control import ControlMixin
 
-nodeNum = 2  # 节点数量
+nodeNum = 3 # 节点数量
 rootnode = "Car0" # 根节点ID
 nodelist = [] # 节点进程列表
 Controlmixin = ControlMixin("Pc") # 控制函数集合
@@ -21,7 +22,10 @@ for i in range(nodeNum):
     node = Node(i+1,mode = False)
     nodelist.append(node)
 
-time.sleep(2)
-DAPPname = "Airsim"
+# 启动MCI
+subprocess.Popen(["python",'-u','./MCI/1_create_db.py'],shell=False).wait()
+subprocess.Popen(["python",'-u','./MCI/2_UE_Main_API.py'],shell=False)
+
+DAPPname = "AirsimMCI"
 print("开始任务："+DAPPname)
 Controlmixin.StartTask(DAPPname,rootnode)

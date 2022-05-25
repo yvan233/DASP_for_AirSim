@@ -4,20 +4,32 @@
       "PORT": [15000, 15001, 15002], 
       "adjID": ["UE1","Tank0"], 
       "adjDirection": [1,2],
-      "datalist": {}
+      "datalist": {
+         "Type": "Car",
+         "Name": "Car0",
+         "Ip":"127.0.0.1"
+         }
    },
    {
       "ID": "Tank0",
       "PORT": [15003, 15004, 15005], 
       "adjID": ["UE1","Car0"], 
       "adjDirection": [1,2],
-      "datalist": {}
+      "datalist": {
+         "Type": "Tank",
+         "Name": "Tank0",
+         "Ip":"127.0.0.1"
+         }
    },
    {
       "ID": "UE1",
       "PORT": [15006, 15007, 15008], 
       "adjID": ["Car0","Tank0"], 
       "adjDirection": [1,2],
-      "datalist": {}
+      "datalist": {
+         "Type": "UE",
+         "Name": "UE1",
+         "Ip":"127.0.0.1"
+      }
    }
 ]

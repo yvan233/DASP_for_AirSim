@@ -5,7 +5,7 @@ import os
 
 db_name = "tank_record.db"
 id = 0
-conn = sqlite3.connect("./MCIP_v0.3.2/{}".format(db_name), check_same_thread=False)
+conn = sqlite3.connect("{}".format(db_name), check_same_thread=False)
 
 # 方法一：利用 pandas 读取数据库数据
 # df = pd.read_sql_query("select * from ID0 order by TIMESTAMP desc limit 10",conn) # 对 xxx_record.db 适用

@@ -8,7 +8,7 @@ from geo_change import *
 说明：本部分请参考接口文档，里面有详细说明
 '''
 
-task_name = "task2"
+task_name = "task1"
 
 tank_init_db = "tank_init.db"
 tank_init_ip = "127.0.0.1"

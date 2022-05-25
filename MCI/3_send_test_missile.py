@@ -8,7 +8,7 @@ from geo_change import *
 说明：本部分请参考接口文档，里面有详细说明
 '''
 
-task_name = "task4"
+task_name = "task1"
 
 missile_init_db = "missile_init.db"
 missile_init_ip = "127.0.0.1"

@@ -4,3 +4,4 @@ PythonClient
 test
 /MCI/backup
 *.db
+*.log
