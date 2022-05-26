@@ -18,10 +18,15 @@ t.start()
 
 # 启动节点进程
 for i in range(nodeNum):
-    node = Node(i+1,mode = False)
+    node = Node(i+1,mode = True)
     nodelist.append(node)
 
 time.sleep(2)
 DAPPname = "Airsim"
+print("开始任务："+DAPPname)
+Controlmixin.StartTask(DAPPname,rootnode)
+
+time.sleep(2)
+DAPPname = "Airsim2"
 print("开始任务："+DAPPname)
 Controlmixin.StartTask(DAPPname,rootnode)

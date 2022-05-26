@@ -1,0 +1,24 @@
+[
+   {
+      "ID": "Car0",
+      "PORT": [10000, 10001], 
+      "adjID": ["UE1"], 
+      "adjDirection": [1],
+      "datalist": {
+         "Type": "Car",
+         "Name": "Car0",
+         "Ip":"127.0.0.1"
+         }
+   },
+   {
+      "ID": "UE1",
+      "PORT": [10010, 10011], 
+      "adjID": ["Car0"], 
+      "adjDirection": [1],
+      "datalist": {
+         "Type": "UE",
+         "Name": "UE1",
+         "Ip":"127.0.0.1"
+      }
+   }
+]

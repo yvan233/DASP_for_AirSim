@@ -72,8 +72,6 @@ class DaspCarClient():
         data = self.recv()
         return data["Method"]
 
-    def close(self):
-        self.sock.close()
 # def get_image(remote_ip = "127.0.0.1", port = 5001):
 #     """
 #     获取图像数据
@@ -105,6 +103,7 @@ def get_lidar(host = "127.0.0.1", port = 5002):
     headerSize = 16
     while True:
         server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        print(host,port)
         server.bind((host, port))
         server.listen(10) #接收的连接数
         conn, addr = server.accept()
@@ -150,9 +149,10 @@ def MessageHandle(headPack, body, conn):
             points = np.frombuffer(body, dtype=np.dtype('f4'))
             # reshape array of floats to array of [X,Y,Z]
             points = np.reshape(points, (int(points.shape[0]/3), 3))
-            print (time_stamp)
+            print (time_stamp, points)
         else:
             info = "暂未提供POST以外的接口"
             print(info)
     except Exception as e:
         print(traceback.format_exc())
+
