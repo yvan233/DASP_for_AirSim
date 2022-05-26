@@ -143,6 +143,7 @@ class AirSimCarAgent():
             self.upload_lidar_flag = True
             self.lidar_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.lidar_socket.connect((remote_ip, port))
+            print((remote_ip, port))
         else:
             pass
 
@@ -177,7 +178,7 @@ class AirSimCarAgent():
             if self.record_flag or self.upload_lidar_flag:
                 time_stamp, lidar_data = self.get_lidar()
                 if self.upload_lidar_flag and lidar_data.size:
-                    self.sendallAddHead(self.video_socket, lidar_data.tobytes(), time_stamp)
+                    self.sendallAddHead(self.lidar_socket, lidar_data.tobytes(), time_stamp)
                 if self.record_flag:
                     filepath = os.path.join(self.path, "pointcloud/pointcloud_" + time_stamp)
                     np.save(filepath, lidar_data)

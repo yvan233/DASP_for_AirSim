@@ -1,9 +1,12 @@
+from sqlite3 import Timestamp
 import cv2
 import socket
 import json
 import time
 import numpy as np
 import struct
+import traceback
+from threading import Thread
 
 class DaspCarClient():
     def __init__(self, host = "localhost", port = 5000):
@@ -58,7 +61,7 @@ class DaspCarClient():
         return data["Method"]
 
     def start_upload(self, parameter):
-        # parameter = {"type": "video","IP": 127.0.0.1,"port": 5001}
+        # parameter = {"type": "video","IP": "127.0.0.1","port": 5001}
         self.send("Start upload", parameter)
         data = self.recv()
         return data["Method"]
@@ -69,26 +72,39 @@ class DaspCarClient():
         data = self.recv()
         return data["Method"]
 
-def get_image(remote_ip = "127.0.0.1", port = 5001):
-    """
-    获取图像数据
-    """
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind((remote_ip, 5001))
-    data, address = sock.recvfrom(65535)
-    imgstring = np.asarray(bytearray(data), dtype="uint8")
-    image = cv2.imdecode(imgstring, cv2.IMREAD_COLOR)
-    sock.close()
-    return image
+# def get_image(remote_ip = "127.0.0.1", port = 5001):
+#     """
+#     获取图像数据
+#     """
+#     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+#     sock.bind((remote_ip, 5001))
+#     data, address = sock.recvfrom(65535)
+#     imgstring = np.asarray(bytearray(data), dtype="uint8")
+#     image = cv2.imdecode(imgstring, cv2.IMREAD_COLOR)
+#     sock.close()
+#     return image
 
-def get_video(self, host, port, adjID = ""):
+# def get_lidar(remote_ip = "127.0.0.1", port = 5002):
+#     """
+#     获取雷达数据
+#     """
+#     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+#     sock.bind((remote_ip, 5002))
+#     data, address = sock.recvfrom(65535)
+#     points = np.frombuffer(data, dtype=np.dtype('f4'))
+#     points = np.reshape(points, (int(points.shape[0]/3), 3)) # reshape array of floats to array of [X,Y,Z]
+#     sock.close()
+#     return points
+
+def get_lidar(host = "127.0.0.1", port = 5002):
     """
     长连接循环接收数据框架
     """
+    headerSize = 16
     while True:
         server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         server.bind((host, port))
-        server.listen(1) #接收的连接数
+        server.listen(10) #接收的连接数
         conn, addr = server.accept()
         print('Connected by {}:{}'.format(addr[0], addr[1]))
         # FIFO消息队列
@@ -99,40 +115,42 @@ def get_video(self, host, port, adjID = ""):
                     data = conn.recv(1024)
                 except Exception as e:
                     # 发送端进程被杀掉
-                    self.RecvDisconnectHandle(addr, adjID)
                     break
                 if data == b"":
                     # 发送端close()
-                    self.RecvDisconnectHandle(addr, adjID)
                     break
                 if data:
                     # 把数据存入缓冲区，类似于push数据
                     dataBuffer += data
                     while True:
-                        if len(dataBuffer) < self.headerSize:
+                        if len(dataBuffer) < headerSize:
                             break  #数据包小于消息头部长度，跳出小循环
                         # 读取包头
-                        headPack = struct.unpack(self.headformat, dataBuffer[:self.headerSize])
+                        headPack = struct.unpack("!IIQ", dataBuffer[:headerSize])
                         bodySize = headPack[1]
-                        if len(dataBuffer) < self.headerSize+bodySize :
+                        if len(dataBuffer) < headerSize+bodySize :
                             break  #数据包不完整，跳出小循环
                         # 读取消息正文的内容
-                        body = dataBuffer[self.headerSize:self.headerSize+bodySize]
-                        body = body.decode()
-                        body = json.loads(body)
+                        body = dataBuffer[headerSize:headerSize+bodySize]
                         # 数据处理
-                        self.MessageHandle(headPack, body, conn)
+                        thread = Thread(target=MessageHandle, args=(headPack, body, conn,))
+                        # 设置成守护线程
+                        thread.setDaemon(True)
+                        thread.start()    
+            
                         # 数据出列
-                        dataBuffer = dataBuffer[self.headerSize+bodySize:]
+                        dataBuffer = dataBuffer[headerSize+bodySize:]
 
-def get_lidar(remote_ip = "127.0.0.1", port = 5002):
-    """
-    获取雷达数据
-    """
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind((remote_ip, 5002))
-    data, address = sock.recvfrom(65535)
-    points = np.frombuffer(data, dtype=np.dtype('f4'))
-    points = np.reshape(points, (int(points.shape[0]/3), 3)) # reshape array of floats to array of [X,Y,Z]
-    sock.close()
-    return points
+def MessageHandle(headPack, body, conn):
+    try:
+        if headPack[0] == 1:
+            time_stamp = headPack[2]
+            points = np.frombuffer(body, dtype=np.dtype('f4'))
+            # reshape array of floats to array of [X,Y,Z]
+            points = np.reshape(points, (int(points.shape[0]/3), 3))
+            print (time_stamp, points)
+        else:
+            info = "暂未提供POST以外的接口"
+            print(info)
+    except Exception as e:
+        print(traceback.format_exc())

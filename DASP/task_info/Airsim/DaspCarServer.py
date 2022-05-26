@@ -14,7 +14,7 @@ class DaspCarServer():
         self.clients["state"] = AirSimCarAgent(ip = UE_ip)
         self.clients["video"] = AirSimCarAgent(ip = UE_ip)
         self.clients["lidar"] = AirSimCarAgent(ip = UE_ip)
-        self.threads = []
+        self.threads = {}
         self.threads["state"] = Thread(target=self.clients["state"].updateState, args = (), daemon=True)
         self.threads["video"] = Thread(target=self.clients["video"].updateVideo, args = (), daemon=True)
         self.threads["lidar"] = Thread(target=self.clients["lidar"].updateLidar, args = (), daemon=True)
@@ -74,11 +74,13 @@ class DaspCarServer():
                 self.send(sock, "Stop OK")
             elif pack["Method"] == "Start upload":
                 parameter = pack['Data']
-                self.car.startUpload(parameter)
+                type = parameter["type"]
+                self.clients[type].startUpload(parameter)
                 self.send(sock, "Start OK")
             elif pack["Method"] == "Stop upload":
                 parameter = pack['Data']
-                self.car.stopUpload(parameter)
+                type = parameter["type"]
+                self.clients[type].stopUpload(parameter)
                 self.send(sock, "Stop OK")
             else:
                 info = "请根据提供的接口发送请求"
