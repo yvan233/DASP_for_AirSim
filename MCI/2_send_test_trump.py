@@ -1,0 +1,100 @@
+import requests
+import json
+import time
+
+from geo_change import *
+
+'''
+说明：本部分请参考接口文档，里面有详细说明
+'''
+
+task_name =  "task_A_202205292026"
+
+trump_init_db = "trump_init.db"
+trump_init_ip = "127.0.0.1"
+trump_init_port = 10004
+trump_record_db = "trump_record.db"
+
+# 二、trump 通讯与控制
+#-----------------------------------------------------------------------------------0
+# 1. 与初始化接口通讯
+# 注意：端口是10004
+data_json = {"data":{"host":trump_init_ip,"port":trump_init_port,"task":task_name}} 
+head = {"Content-Type": "application/json; charset=UTF-8", 'Connection': 'close'}
+url ="http://127.0.0.1:5000/api/start_service_trump"
+r = requests.post(url,json=data_json,headers=head)
+if r.status_code == 200:
+    data = json.loads(r.text)
+    print(data)
+
+time.sleep(5)
+
+# 获取 动态UE4坐标系的原点坐标
+ox,oy,oz = data["data"]["origin_coordinate"]
+
+# 将UE静态坐标转为GPS坐标，假设UE原点对应的高德火星坐标是116.174646, 40.055388
+# https://lbs.amap.com/tools/picker
+# sx1,sy1,sz1 = 1240.0,2120.0,0.0
+# lng0, lat0 = gcj02_to_wgs84(116.174646, 40.055388)
+# alt0 = 150. # 北京平均海拔
+
+# lng1,lat1,alt1 = ues2gps(sx1,sy1,sz1,lng0,lat0,alt0)
+lng1,lat1,alt1 = 116.168297539873,40.053015051946,157.126980113759
+
+# 2. 与trump数据存储接口通讯
+data_json = {"data":{"task":task_name,"record_all":1}} 
+head = {"Content-Type": "application/json; charset=UTF-8", 'Connection': 'close'}
+url ="http://127.0.0.1:5000/api/record_data_trump"
+r = requests.post(url,json=data_json,headers=head)
+if r.status_code == 200:
+    data = json.loads(r.text)
+    print(data)
+
+
+'''
+  说明：前两步在UE4运行前就发送，执行完成之后，可以在任意时刻发送下方的控制命令
+'''
+
+time.sleep(5)
+
+# 3. 与trump控制接口通讯
+
+# 让特朗普走到椅子的位置
+# data_json = {"data":{"MIS_AI":{"data":{"option":0,"destination":{"xc":-3000.0,"yc":3000.0,"zc":500.0}}},'MIS_AI2':{"data":{"option":0,"destination":{"xc":-3000.0,"yc":3000.0,"zc":500.0}}}}}
+data_json = {"data":{"TP_AI":{"data":{"option":0,"destination":{"lng":lng1,"lat":lat1,"alt":alt1}}}}}
+head = {"Content-Type": "application/json; charset=UTF-8", 'Connection': 'close'}
+url ="http://127.0.0.1:5000/api/control_trump"
+r = requests.post(url,json=data_json,headers=head)
+if r.status_code == 200:
+    data = json.loads(r.text)
+    print(data)
+
+time.sleep(25)
+# 控制特朗普坐下
+data_json = {"data":{"TP_AI":{"data":{"option":2}}}}
+head = {"Content-Type": "application/json; charset=UTF-8", 'Connection': 'close'}
+url ="http://127.0.0.1:5000/api/control_trump"
+r = requests.post(url,json=data_json,headers=head)
+if r.status_code == 200:
+    data = json.loads(r.text)
+    print(data)
+
+time.sleep(2)
+# 特朗普起身走两步
+data_json = {"data":{"TP_AI":{"data":{"option":1,"control":{"forward":0.0,"right":0.2}}}}}
+head = {"Content-Type": "application/json; charset=UTF-8", 'Connection': 'close'}
+url ="http://127.0.0.1:5000/api/control_trump"
+r = requests.post(url,json=data_json,headers=head)
+if r.status_code == 200:
+    data = json.loads(r.text)
+    print(data)
+
+time.sleep(3)
+# 控制特朗普倒地死亡
+data_json = {"data":{"TP_AI":{"data":{"option":3}}}}
+head = {"Content-Type": "application/json; charset=UTF-8", 'Connection': 'close'}
+url ="http://127.0.0.1:5000/api/control_trump"
+r = requests.post(url,json=data_json,headers=head)
+if r.status_code == 200:
+    data = json.loads(r.text)
+    print(data)
