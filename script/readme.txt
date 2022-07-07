@@ -8,4 +8,4 @@
 4. 录制cyberbag 
    cyber_recorder record -a
 5. 回放cyberbag
-   cyber_recorder play -f -loop 20220707170512.record.00000
+   cyber_recorder play -f 20220707170512.record.00000 -loop
